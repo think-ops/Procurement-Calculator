@@ -1,0 +1,384 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Procurement Cheque Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen ledger — desktop: inputs left, result right; phone: one compact column */
+:root{
+  --bg:#f2f4f1; --surface:#ffffff; --fg:#1b2420; --muted:#5d6b64; --line:#d5dcd7;
+  --accent:#1f6b4f; --accent-soft:#e3efe9; --deduct:#a4442b; --slip:#f7faf6;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121815; --surface:#1a221e; --fg:#e4ebe7; --muted:#93a39b; --line:#2e3a34;
+  --accent:#5fc49b; --accent-soft:#1f3329; --deduct:#ec8c70; --slip:#17201b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121815; --surface:#1a221e; --fg:#e4ebe7; --muted:#93a39b; --line:#2e3a34;
+  --accent:#5fc49b; --accent-soft:#1f3329; --deduct:#ec8c70; --slip:#17201b; color-scheme:dark}
+
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.4}
+.wrap{max-width:960px;margin:0 auto;padding-block:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:12px;grid-template-columns:1fr;}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+h1{font-size:1.15rem;font-weight:600;margin:0}
+.sub{margin:0;color:var(--muted);font-size:.8rem}
+.col{display:grid;gap:12px;align-content:start;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
+label,.lbl{font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.lbl-hint{text-transform:none;letter-spacing:0;font-weight:400;font-family:var(--mono)}
+.row{display:grid;grid-template-columns:1.7fr 1fr 1fr;gap:8px}
+.field{position:relative;min-width:0}
+input{width:100%;box-sizing:border-box;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:7px}
+input[type=number]{font:500 1rem var(--mono);padding:8px 10px;font-variant-numeric:tabular-nums}
+input[type=text]{font:400 .9rem var(--sans);padding:8px 10px}
+.field .unit{position:absolute;right:10px;bottom:9px;color:var(--muted);font-family:var(--mono);pointer-events:none}
+.field.pct input{padding-right:26px}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:500 .84rem var(--sans);background:transparent;color:var(--muted);border:0;padding:8px 6px;cursor:pointer;line-height:1.25}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td{padding:6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:last-child{text-align:right;font-family:var(--mono);white-space:nowrap;padding-left:10px}
+td small{display:block;color:var(--muted);font-family:var(--mono);font-size:.72rem}
+tr.ded td:last-child{color:var(--deduct)}
+tr:last-child td{border-bottom:0;font-weight:600}
+.card.bd{padding-block:6px}
+
+.slip{background:var(--slip);border:1.5px dashed var(--accent);border-radius:10px;padding:14px;display:grid;gap:6px}
+.slip .k{font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.slip .big{font:600 1.75rem var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.15}
+.slip .words{font-size:.88rem;border-top:1px solid var(--line);padding-top:6px}
+.slip .gov{font-size:.78rem;color:var(--muted)}
+.linkbtn{font:500 .78rem var(--sans);background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;justify-self:start}
+
+.exp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.exp input{flex:1 1 160px;min-width:0}
+.btn{font:500 .85rem var(--sans);background:var(--accent);color:var(--surface);border:1px solid var(--accent);border-radius:7px;padding:8px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.copied{font-size:.78rem;color:var(--accent)}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preview{position:fixed;inset:0;z-index:20;background:rgba(10,14,12,.7);display:grid;place-items:center;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.pv-box{background:var(--surface);border-radius:10px;padding:12px;max-width:min(720px,100%);max-height:100%;display:grid;grid-template-rows:auto auto 1fr;gap:10px;overflow:hidden}
+.pv-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pv-name code{font:500 .85rem var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere;user-select:all}
+.pv-head{display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:.85rem}
+.pv-box img{max-width:100%;max-height:calc(100vh - 190px);object-fit:contain;justify-self:center;border:1px solid var(--line)}
+
+@media (min-width:760px){
+  .wrap{grid-template-columns:1fr 1fr;column-gap:16px;padding-block:24px}
+  header{grid-column:1/-1}
+  .slip .big{font-size:2rem}
+}
+@media (max-width:420px){
+  .row{grid-template-columns:1.6fr 1fr 1fr;gap:6px}
+  input[type=number]{font-size:.95rem;padding:8px}
+  .field.pct input{padding-right:22px}
+  .field .unit{right:7px}
+  td small{display:none}
+  .card{padding:12px;gap:10px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Procurement Cheque Calculator</h1>
+    <p class="sub">VAT &amp; AIT deducted at source · BDT</p>
+  </header>
+
+  <div class="col">
+    <section class="card" aria-label="Inputs">
+      <div class="row">
+        <div class="field">
+          <label for="amount">Amount <span class="lbl-hint" id="amountHint"></span></label>
+          <input id="amount" type="number" min="0" step="any" value="700000" inputmode="decimal">
+        </div>
+        <div class="field pct">
+          <label for="vat">VAT</label>
+          <input id="vat" type="number" min="0" step="any" value="10" inputmode="decimal"><span class="unit">%</span>
+        </div>
+        <div class="field pct">
+          <label for="ait">AIT</label>
+          <input id="ait" type="number" min="0" step="any" value="5" inputmode="decimal"><span class="unit">%</span>
+        </div>
+      </div>
+      <div>
+        <span class="lbl">Amount is</span>
+        <div class="seg" id="dir">
+          <button type="button" id="dir-bill" data-v="bill" aria-pressed="true">Total bill</button>
+          <button type="button" id="dir-net" data-v="net" aria-pressed="false">Vendor receives</button>
+        </div>
+      </div>
+      <div>
+        <span class="lbl">VAT &amp; AIT taken on</span>
+        <div class="seg" id="method">
+          <button type="button" id="m-std" data-v="std" aria-pressed="true">Price excl. VAT</button>
+          <button type="button" id="m-flat" data-v="flat" aria-pressed="false">Full bill (flat)</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="exportCard" aria-label="Export">
+      <div class="meta">
+        <div class="field">
+          <label for="vendor">Vendor</label>
+          <input id="vendor" type="text" placeholder="Vendor name">
+        </div>
+        <div class="field">
+          <label for="project">Project</label>
+          <input id="project" type="text" placeholder="Project name">
+        </div>
+      </div>
+      <div class="exp">
+        <input id="ref" type="text" placeholder="Reference / PO no. (optional)" aria-label="Reference">
+        <button class="btn" type="button" id="expPdf">Export PDF</button>
+        <button class="btn ghost" type="button" id="expJpg">Export JPG</button>
+      </div>
+      <span class="copied" id="expMsg" hidden></span>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="slip" aria-label="Cheque">
+      <div class="k">Cheque to vendor</div>
+      <div class="big" id="cheque">—</div>
+      <div class="words" id="words"></div>
+      <div class="gov" id="gov"></div>
+      <button class="linkbtn" type="button" id="copy">Copy amount in words</button>
+      <span class="copied" id="copied" hidden>Copied</span>
+    </section>
+    <section class="card bd" aria-label="Breakdown">
+      <table><tbody id="rows"></tbody></table>
+    </section>
+  </div>
+</div>
+
+<div class="preview" id="preview" hidden role="dialog" aria-label="Export preview">
+  <div class="pv-box">
+    <div class="pv-head"><span id="pvNote"></span><button class="btn" type="button" id="pvClose">Close</button></div>
+    <div class="pv-name"><code id="pvName"></code><button class="btn ghost" type="button" id="pvCopy">Copy name</button></div>
+    <img id="pvImg" alt="Exported calculation sheet">
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const state={dir:'bill',method:'std'};
+const fmt=(n,d=2)=>'৳ '+n.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+function lakhWords(n){
+  const ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  const two=x=>x<20?ones[x]:tens[Math.floor(x/10)]+(x%10?' '+ones[x%10]:'');
+  const three=x=>{const h=Math.floor(x/100),r=x%100;return (h?ones[h]+' Hundred'+(r?' ':''):'')+(r?two(r):'')};
+  if(n===0)return 'Zero';
+  const parts=[];
+  const crore=Math.floor(n/1e7); n%=1e7;
+  if(crore) parts.push((crore>=100?lakhWords(crore):two(crore))+' Crore');
+  const lakh=Math.floor(n/1e5); n%=1e5; if(lakh) parts.push(two(lakh)+' Lakh');
+  const th=Math.floor(n/1e3); n%=1e3; if(th) parts.push(two(th)+' Thousand');
+  if(n) parts.push(three(n));
+  return parts.join(' ');
+}
+
+function calc(){
+  const A=+$('amount').value||0, v=(+$('vat').value||0)/100, t=(+$('ait').value||0)/100;
+  $('amountHint').textContent=A?'· '+(A/1e5).toLocaleString('en-IN',{maximumFractionDigits:2})+' lakh':'';
+  let bill;
+  if(state.dir==='bill') bill=A;
+  else bill= state.method==='std' ? A*(1+v)/(1-t) : A/(1-v-t);
+  let base,vat,ait;
+  if(state.method==='std'){ base=bill/(1+v); vat=base*v; ait=base*t; }
+  else { base=bill; vat=bill*v; ait=bill*t; }
+  const cheque=bill-vat-ait;
+
+
+  const rows=[
+    ['Total bill (incl. VAT)', '', bill, ''],
+    ...(state.method==='std'?[['Price excl. VAT', 'bill ÷ '+(1+v).toFixed(4).replace(/0+$/,'').replace(/\.$/,''), base, '']]:[]),
+    ['VAT deducted', (v*100)+'% of '+(state.method==='std'?'price excl. VAT':'bill'), -vat, 'ded'],
+    ['AIT deducted', (t*100)+'% of '+(state.method==='std'?'price excl. VAT':'bill'), -ait, 'ded'],
+    ['Cheque to vendor', 'bill − VAT − AIT', cheque, '']
+  ];
+  $('rows').innerHTML=rows.map(([k,s,n,c])=>
+    `<tr class="${c}"><td>${k}${s?`<small>${s}</small>`:''}</td><td>${n<0?'− '+fmt(-n):fmt(n)}</td></tr>`).join('');
+
+  const valid=isFinite(cheque)&&cheque>=0&&(v+t)<1;
+  const r=valid?Math.round(cheque):0;
+  $('cheque').textContent=valid?fmt(r,0)+'/-':'Check the rates';
+  $('words').textContent=valid?'Taka '+lakhWords(r)+' Only':'';
+  $('gov').textContent=valid?`Deposit by treasury challan: VAT ${fmt(vat)} · AIT ${fmt(ait)}`:'';
+  R={valid,A,v,t,bill,base,vat,ait,cheque:r,rows,words:$('words').textContent};
+  $('expPdf').disabled=$('expJpg').disabled=!valid;
+}
+let R=null;
+
+/* ---- Export: draw a formatted sheet on canvas, save as JPG or PDF ---- */
+function drawSheet(){
+  const W=1240, P=90, sc=1; // A4 width at 150 dpi
+  const c=document.createElement('canvas'); c.width=W; c.height=1754;
+  const g=c.getContext('2d');
+  const ink='#1b2420', muted='#5d6b64', line='#d5dcd7', acc='#1f6b4f', ded='#a4442b';
+  const sans='"IBM Plex Sans", Arial, sans-serif', mono='"IBM Plex Mono", "Courier New", monospace';
+  g.fillStyle='#ffffff'; g.fillRect(0,0,W,c.height);
+  let y=P+20;
+  g.fillStyle=ink; g.font=`600 44px ${sans}`; g.fillText('Procurement Payment Calculation',P,y);
+  y+=46; g.fillStyle=muted; g.font=`400 24px ${sans}`;
+  const d=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  g.fillText('Date: '+d,P,y);
+  [['Vendor',$('vendor').value],['Project',$('project').value],['Reference',$('ref').value]].forEach(([k,v])=>{
+    v=v.trim(); if(v){y+=34; g.fillText(k+': '+v,P,y);}
+  });
+  y+=30; g.fillStyle=acc; g.fillRect(P,y,W-2*P,3);
+
+  // Inputs
+  y+=60; g.fillStyle=muted; g.font=`600 20px ${sans}`; g.fillText('INPUTS',P,y);
+  const inputs=[
+    ['Amount entered', fmt(R.A)],
+    ['Amount type', state.dir==='bill'?'Total bill (incl. VAT)':'What vendor must receive'],
+    ['VAT rate', (R.v*100)+'%'],
+    ['Tax (AIT) rate', (R.t*100)+'%'],
+    ['Method', state.method==='std'?'VAT & AIT on price excl. VAT':'Flat % on full bill']
+  ];
+  y+=14;
+  inputs.forEach(([k,val])=>{
+    y+=46; g.fillStyle=ink; g.font=`400 26px ${sans}`; g.fillText(k,P,y);
+    g.textAlign='right'; g.font=`500 26px ${val.startsWith('৳')?mono:sans}`; g.fillText(val,W-P,y); g.textAlign='left';
+  });
+
+  // Breakdown
+  y+=70; g.fillStyle=muted; g.font=`600 20px ${sans}`; g.fillText('BREAKDOWN',P,y);
+  y+=14;
+  R.rows.forEach(([k,s,n,cls],i)=>{
+    const last=i===R.rows.length-1;
+    y+= s?62:50;
+    g.fillStyle=ink; g.font=`${last?600:400} 26px ${sans}`; g.fillText(k,P,y-(s?18:0));
+    if(s){g.fillStyle=muted; g.font=`400 20px ${mono}`; g.fillText(s,P,y+10);}
+    g.textAlign='right'; g.fillStyle=cls==='ded'?ded:ink; g.font=`${last?600:500} 26px ${mono}`;
+    g.fillText(n<0?'− '+fmt(-n):fmt(n),W-P,y-(s?18:0)); g.textAlign='left';
+    y+=s?24:16; g.fillStyle=line; g.fillRect(P,y,W-2*P,1.5);
+  });
+
+  // Cheque box
+  y+=50; const bh=230;
+  g.fillStyle='#f3f8f5'; g.fillRect(P,y,W-2*P,bh);
+  g.setLineDash([12,8]); g.strokeStyle=acc; g.lineWidth=3; g.strokeRect(P,y,W-2*P,bh); g.setLineDash([]);
+  g.fillStyle=acc; g.font=`600 20px ${sans}`; g.fillText('CHEQUE TO VENDOR',P+30,y+48);
+  g.fillStyle=ink; g.font=`600 56px ${mono}`; g.fillText(fmt(R.cheque,0)+'/-',P+30,y+118);
+  g.font=`400 26px ${sans}`; wrap(g,'Taka '+lakhWords(R.cheque)+' Only',P+30,y+168,W-2*P-60,34);
+
+  y+=bh+60; g.fillStyle=muted; g.font=`600 20px ${sans}`; g.fillText('DEPOSIT BY TREASURY CHALLAN',P,y);
+  [['VAT',R.vat],['AIT',R.ait]].forEach(([k,n])=>{
+    y+=46; g.fillStyle=ink; g.font=`400 26px ${sans}`; g.fillText(k,P,y);
+    g.textAlign='right'; g.font=`500 26px ${mono}`; g.fillText(fmt(n),W-P,y); g.textAlign='left';
+  });
+
+  // Trim height to content
+  const H=Math.min(1754,y+P);
+  const out=document.createElement('canvas'); out.width=W; out.height=H;
+  out.getContext('2d').drawImage(c,0,0);
+  return out;
+}
+function wrap(g,text,x,y,max,lh){
+  let lineTxt=''; text.split(' ').forEach(w=>{
+    const test=lineTxt?lineTxt+' '+w:w;
+    if(g.measureText(test).width>max&&lineTxt){g.fillText(lineTxt,x,y);y+=lh;lineTxt=w}else lineTxt=test;
+  }); g.fillText(lineTxt,x,y);
+}
+function fileBase(){
+  // VENDOR NAME_PROJECT NAME_TOTAL AMOUNT (total bill, whole taka)
+  const clean=x=>x.trim().replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,' ').slice(0,60);
+  const parts=[clean($('vendor').value),clean($('project').value),String(Math.round(R.bill))].filter(Boolean);
+  return parts.join('_');
+}
+function msg(t){const m=$('expMsg');m.textContent=t;m.hidden=!t;if(t)setTimeout(()=>m.hidden=true,3000)}
+
+let dlP=null;
+function getDownloads(){
+  // window.claude may arrive after first run; ask at click time
+  if(!dlP){
+    if(!window.claude||!window.claude.use) return Promise.resolve(null);
+    dlP=window.claude.use('downloads').catch(()=>null);
+  }
+  return dlP;
+}
+function showPreview(cv,kind,name){
+  $('pvImg').src=cv.toDataURL('image/jpeg',0.92);
+  $('pvNote').textContent=(kind==='pdf'?'PDF can only be saved when this page is open inside claude.ai. ':'')+
+    'Right-click (or long-press) the image, choose "Save image as", then paste this name:';
+  $('pvName').textContent=name.replace(/\.pdf$/,'.jpg');
+  $('preview').hidden=false;
+}
+function isTop(){try{return window.top===window}catch(e){return false}}
+function anchorSave(blob,name){
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+async function save(kind){
+  if(!R||!R.valid)return;
+  try{await document.fonts.ready}catch(e){}
+  const cv=drawSheet();
+  let data, name=fileBase()+(kind==='pdf'?'.pdf':'.jpg');
+  if(kind==='jpg'||!window.jspdf){
+    data=await new Promise(res=>cv.toBlob(res,'image/jpeg',0.92));
+    if(kind==='pdf'){showPreview(cv,kind,name);return}
+  }else{
+    const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    const w=210, h=cv.height*w/cv.width;
+    pdf.addImage(cv.toDataURL('image/jpeg',0.95),'JPEG',0,0,w,h);
+    data=pdf.output('blob');
+  }
+  const dl=await getDownloads();
+  if(dl){
+    try{await dl.save({filename:name,data}); msg('Saved '+name); return}
+    catch(e){
+      const c=e&&e.code;
+      if(c==='declined')return;
+      if(c==='rate_limited'){msg('A save prompt is already open.');return}
+    }
+  }else dlP=null;
+  // Opened as its own browser tab: a normal download works there
+  if(isTop()){ anchorSave(data,name); msg('Downloaded '+name); return }
+  showPreview(cv,kind,name);
+}
+$('expPdf').addEventListener('click',()=>save('pdf'));
+$('expJpg').addEventListener('click',()=>save('jpg'));
+$('pvCopy').addEventListener('click',()=>{
+  const t=$('pvName').textContent, b=$('pvCopy');
+  const sel=()=>{const r=document.createRange();r.selectNodeContents($('pvName'));const s=getSelection();s.removeAllRanges();s.addRange(r)};
+  try{navigator.clipboard.writeText(t).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy name',1500)},sel)}catch(e){sel()}
+});
+$('pvClose').addEventListener('click',()=>$('preview').hidden=true);
+$('preview').addEventListener('click',e=>{if(e.target.id==='preview')$('preview').hidden=true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('preview').hidden=true});
+
+function seg(id,key){
+  $(id).addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    state[key]=b.dataset.v;
+    $(id).querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+    calc();
+  });
+}
+seg('dir','dir'); seg('method','method');
+['amount','vat','ait'].forEach(i=>$(i).addEventListener('input',calc));
+
+$('copy').addEventListener('click',()=>{
+  const txt=$('words').textContent;
+  const done=()=>{$('copied').hidden=false;setTimeout(()=>$('copied').hidden=true,1500)};
+  try{navigator.clipboard.writeText(txt).then(done,selectWords)}catch(e){selectWords()}
+});
+function selectWords(){const r=document.createRange();r.selectNodeContents($('words'));const s=getSelection();s.removeAllRanges();s.addRange(r)}
+calc();
+</script>
+
+
+</body></html>
